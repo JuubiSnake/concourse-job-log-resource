@@ -1,0 +1,4 @@
+github.com/donovanhide/eventsource v0.0.0-20171031113327-3ed64d21fb0b h1:eR1P/A4QMYF2/LpHRhYAts9wyYEtF7qNk/tVNiYCWc8=
+github.com/donovanhide/eventsource v0.0.0-20171031113327-3ed64d21fb0b/go.mod h1:56wL82FO0bfMU5RvfXoIwSOP2ggqqxT+tAfNEIyxuHw=
+github.com/pborman/ansi v0.0.0-20160920233902-86f499584b0a h1:Yw/M+CoU75So9ZUQpRGOdwWvS9fHKSmhT+e+np+oF90=
+github.com/pborman/ansi v0.0.0-20160920233902-86f499584b0a/go.mod h1:SgWzwMAx1X/Ez7i90VqF8LRiQtx52pWDiQP+x3iGnzw=
