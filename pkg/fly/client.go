@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
-	"math"
 	"net/http"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,6 +29,18 @@ type Creds struct {
 	Pipeline    string `json:"pipeline"`
 	Job         string `json:"job"`
 	HasFinished bool   `json:"finished"`
+}
+
+type buildDataList []buildData
+
+func (s buildDataList) Len() int {
+	return len(s)
+}
+func (s buildDataList) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s buildDataList) Less(i, j int) bool {
+	return s[i].Data.Time < s[j].Data.Time
 }
 
 type Build struct {
@@ -124,7 +135,7 @@ func (c *Client) ScrapeLogs(apiURL string) (string, error) {
 	}
 
 	sb := new(strings.Builder)
-	seenLog := make(map[string]int)
+	logmap := make(map[string]buildDataList)
 	for {
 		select {
 		case e := <-stream.Events:
@@ -133,31 +144,37 @@ func (c *Client) ScrapeLogs(apiURL string) (string, error) {
 				continue
 			}
 			if err := json.Unmarshal([]byte(e.Data()), &bd); err != nil {
-				log.Printf("\n%+v\n", e.Data())
 				return "", err
 			}
 			if bd.Data.Payload == "" {
 				continue
 			}
-			if original, seen := seenLog[bd.Data.Payload]; seen {
-				if math.Abs(float64(original-bd.Data.Time)) <= 10 {
-					continue
-				}
+			if logmap[bd.Data.Origin.ID] == nil {
+				logmap[bd.Data.Origin.ID] = []buildData{}
 			}
-			seenLog[bd.Data.Payload] = bd.Data.Time
-
-			fmtdPayload, err := ansi.Strip([]byte(bd.Data.Payload))
-			if err != nil {
-				return "", err
-			}
-			t := time.Unix(int64(bd.Data.Time), 0)
-			logEntry := fmt.Sprintf("%s:\n%s\n", t.String(), string(fmtdPayload))
-			if _, err := sb.WriteString(logEntry); err != nil {
-				return "", err
-			}
+			logmap[bd.Data.Origin.ID] = append(logmap[bd.Data.Origin.ID], bd)
 
 		case <-time.After(time.Second * 5):
-			stream.Close()
+			for k, v := range logmap {
+				sort.Sort(v)
+				if _, err := sb.WriteString(fmt.Sprintf("\n==============================| %s - START |==============================\n", k)); err != nil {
+					return "", err
+				}
+				for i := range v {
+					fmtdPayload, err := ansi.Strip([]byte(v[i].Data.Payload))
+					if err != nil {
+						return "", err
+					}
+					t := time.Unix(int64(v[i].Data.Time), 0)
+					logEntry := fmt.Sprintf("%s:\n%s", t.String(), string(fmtdPayload))
+					if _, err := sb.WriteString(logEntry); err != nil {
+						return "", err
+					}
+				}
+				if _, err := sb.WriteString(fmt.Sprintf("\n==============================|  %s - END  |==============================\n", k)); err != nil {
+					return "", err
+				}
+			}
 			return sb.String(), nil
 		}
 	}
